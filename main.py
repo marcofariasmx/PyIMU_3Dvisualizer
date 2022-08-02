@@ -12,15 +12,14 @@ import threading
 ApplicationGL = False
 
 class PortSettings:
-    Name = "COM1"
-    Speed = 9600
+    Name = "COM3"
+    Speed = 115200
     Timeout = 2
+
 class IMU:
     Roll = 0
     Pitch = 0
     Yaw = 0
-
-
 
 myport = PortSettings()
 myimu  = IMU()
@@ -41,25 +40,25 @@ positionRight = int(ConfWindw.winfo_screenwidth()/2 - 300/2)
 positionDown = int(ConfWindw.winfo_screenheight()/2 - 150/2)
 ConfWindw.geometry("+{}+{}".format(positionRight, positionDown))
 
-Port_label = Label(text = "Port:",font =("",12),justify= "right",bg = "#2E2D40",fg = "#FFFFFF")
-Port_label.place(x = 50, y =30,anchor = "center")
-Port_entry = Entry(width = 20,bg = "#37364D", fg = "#FFFFFF", justify = "center")
+Port_label = Label(text = "Port:", font =("",12), justify= "right", bg = "#2E2D40", fg = "#FFFFFF")
+Port_label.place(x = 50, y =30, anchor = "center")
+Port_entry = Entry(width = 20, bg = "#37364D", fg = "#FFFFFF", justify = "center")
 Port_entry.insert(INSERT,myport.Name)
 Port_entry.place(x = 180, y = 30,anchor = "center")
 
-Baud_label = Label(text = "Speed:",font =("",12),justify= "right",bg = "#2E2D40",fg = "#FFFFFF")
-Baud_label.place(x = 50, y =80,anchor = "center")
+Baud_label = Label(text = "Speed:", font =("",12), justify= "right", bg = "#2E2D40", fg = "#FFFFFF")
+Baud_label.place(x = 50, y =80, anchor = "center")
 Baud_entry = Entry(width = 20,bg = "#37364D", fg = "#FFFFFF", justify = "center")
 Baud_entry.insert(INSERT,str(myport.Speed))
-Baud_entry.place(x = 180, y = 80,anchor = "center")
+Baud_entry.place(x = 180, y = 80, anchor = "center")
 
 ok_button = Button(text = "Ok",width = 8,command = RunAppliction,bg="#135EF2",fg ="#FFFFFF")
-ok_button.place(x = 150, y = 120,anchor="center")
+ok_button.place(x = 150, y = 120, anchor="center")
 
 def InitPygame():
     global display
     pygame.init()
-    display = (640,480)
+    display = (1280,960)
     pygame.display.set_mode(display, DOUBLEBUF|OPENGL)
     pygame.display.set_caption('IMU visualizer   (Press Esc to exit)')
 
@@ -102,8 +101,9 @@ def DrawGL():
 
     glRotatef(round(myimu.Pitch,1), 0, 0, 1)
     glRotatef(round(myimu.Roll,1), -1, 0, 0)
+    glRotatef(round(myimu.Yaw,1), 0, 1, 0)
 
-    DrawText("Roll: {}°               Pitch: {}°".format(round(myimu.Roll,1),round(myimu.Pitch,1)))
+    DrawText(" Roll: {}°     Pitch: {}°      Yaw: {}°".format(round(myimu.Roll,1),round(myimu.Pitch,1),round(myimu.Yaw,1)))
     DrawBoard()
     pygame.display.flip()
 
@@ -112,18 +112,30 @@ def SerialConnection ():
     serial_object = serial.Serial( myport.Name, baudrate= myport.Speed, timeout = myport.Timeout)
 
 def ReadData():
+
     while True:
         
         serial_input = serial_object.readline()
-        if(len(serial_input) == 9 and serial_input[0] == 0x24 ): 
-            X = [serial_input[2], serial_input[1]]
-            Ax = int.from_bytes(X,byteorder = 'big',signed=True)
+        #Convert serial byte line to string
+        serial_input = serial_input.decode('unicode_escape')
 
-            Y = [serial_input[4], serial_input[3]]
-            Ay = int.from_bytes(Y,byteorder = 'big',signed=True)
+        # Received dataframe example:
+        # Orientation: 347.66, 1.26, 1.38 (YAW, PITCH, ROLL)
+        # Quaternion: 0.1076, -0.0097, 0.0132, 0.9941
 
-            myimu.Roll = Ax/16384.0*90
-            myimu.Pitch = Ay/16384.0*90
+        if serial_input[0] == 'O': #Orientation
+            serial_input = serial_input[13:].rstrip('\n')
+            orientationData = serial_input.split(', ')
+            yaw = orientationData[0]
+            pitch = orientationData[1]
+            roll = orientationData[2]
+
+            print(yaw, pitch, roll)
+
+            #Convert string values to float
+            myimu.Roll = float(roll)
+            myimu.Pitch = float(pitch)
+            myimu.Yaw = float(yaw)
 
 
 def main():
